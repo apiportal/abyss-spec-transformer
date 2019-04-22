@@ -1,0 +1,6 @@
+.idea/
+.vertx
+target/
+log/
+*.iml
+*.log
