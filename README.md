@@ -1,6 +1,6 @@
 # ABYSS SPEC TRANSFORMER
 
-This application generates an OpenAPI definition file based on  3.0 specification from a wsdl which gives as a URL or directory path. 
+This application generates an `OpenAPI` definition file based on 3.0 specification from a `WSDL` which gives as a URL or directory path. 
 An example is below
 
 **Input**
@@ -107,8 +107,8 @@ An example is below
 **Output**
 
 ```java
-OpenAPITransformer openAPITransformer = new OpenAPITransformer();
-    openAPITransformer.transform("http://thomas-bayer.com/axis2/services/BLZService?wsdl");`
+String sourcePath = "http://thomas-bayer.com/axis2/services/BLZService?wsdl";
+return new OpenAPITransformer().transform(sourcePath);        
 ```
 
 ```yaml
