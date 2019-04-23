@@ -35,7 +35,7 @@ public interface IAbyssTransformer {
      * @param path url or directory
      * @return yaml file
      * @throws JsonProcessingException encountered problem while processing JSON content
-     * @throws WSDLException encountered problem while processing WSDL content
+     * @throws WSDLException           encountered problem while processing WSDL content
      */
     String transform(String path) throws JsonProcessingException, WSDLException;
 }
