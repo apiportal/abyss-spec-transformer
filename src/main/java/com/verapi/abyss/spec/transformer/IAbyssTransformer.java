@@ -17,9 +17,10 @@
  * under the License.
  */
 
-package io.abyss.spec.transformer;
+package com.verapi.abyss.spec.transformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+
 import javax.wsdl.WSDLException;
 
 /**
@@ -27,14 +28,14 @@ import javax.wsdl.WSDLException;
  * Created on 2019-04-23
  */
 
-public interface IAbyssTransformer
-{
+public interface IAbyssTransformer {
     /**
      * Transforms the WSDL which given with the definition
      *
      * @param path url or directory
      * @return yaml file
-     * @throws JsonProcessingException
+     * @throws JsonProcessingException encountered problem while processing JSON content
+     * @throws WSDLException encountered problem while processing WSDL content
      */
     String transform(String path) throws JsonProcessingException, WSDLException;
 }

@@ -1,10 +1,12 @@
-package io.abyss.spec.transformer;
+package com.verapi.abyss.spec.transformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+
 import static org.junit.Assert.assertFalse;
+
 import javax.wsdl.WSDLException;
 
 /**

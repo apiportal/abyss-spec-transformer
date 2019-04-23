@@ -7,9 +7,10 @@
     <groupId>com.verapi.abyss</groupId>
     <artifactId>abyss-spec-transformer</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
 
-    <name>Abyss Spec Transformer</name>
-    <description>Abyss Spec Transformer Project</description>
+    <name>Abyss API Specification Transformer</name>
+    <description>Abyss API Specification Transformer Project</description>
     <url>https://apiportal.com</url>
 
     <organization>
@@ -48,7 +49,7 @@
             <organization>Verapi</organization>
             <organizationUrl>https://verapi.com</organizationUrl>
             <roles>
-                <role>Developer</role>
+                <role>Enterprise Architect</role>
             </roles>
             <timezone>+3</timezone>
         </contributor>
@@ -68,13 +69,15 @@
 
 
     <properties>
-        <cxf.version>3.3.0</cxf.version>
-        <swagger.parser.version>2.0.9</swagger.parser.version>
-        <snakeYaml.version>1.24</snakeYaml.version>
-        <lombok.version>1.16.20</lombok.version>
-        <logback.version>1.2.3</logback.version>
-        <slf4j.version>1.7.25</slf4j.version>
-        <junit.version>4.12</junit.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <version.wsdl4j>1.6.3</version.wsdl4j>
+        <version.swagger-parser>2.0.11</version.swagger-parser>
+        <version.swagger-models>2.0.7</version.swagger-models>
+        <version.snakeYaml>1.24</version.snakeYaml>
+        <version.jackson-core>2.9.8</version.jackson-core>
+        <version.jackson-annotations>2.9.8</version.jackson-annotations>
+        <version.jackson-dataformat-yaml>2.9.8</version.jackson-dataformat-yaml>
+        <version.junit>4.12</version.junit>
         <version.maven-project-info-reports-plugin>3.0.0</version.maven-project-info-reports-plugin>
         <versions-maven-plugin>2.5</versions-maven-plugin>
         <version.maven-site-plugin>3.7.1</version.maven-site-plugin>
@@ -83,6 +86,7 @@
         <version.maven-enforcer-plugin>3.0.0-M2</version.maven-enforcer-plugin>
         <version.maven-resources-plugin>3.1.0</version.maven-resources-plugin>
         <version.maven-dependency-plugin>3.1.1</version.maven-dependency-plugin>
+        <version.maven-shade-plugin>3.2.1</version.maven-shade-plugin>
         <version.maven-compiler-plugin>3.8.0</version.maven-compiler-plugin>
         <version.clean.plugin>3.1.0</version.clean.plugin>
         <version.deploy.plugin>2.8.2</version.deploy.plugin>
@@ -99,34 +103,44 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.apache.cxf</groupId>
-            <artifactId>cxf-rt-wsdl</artifactId>
-            <version>${cxf.version}</version>
+            <groupId>wsdl4j</groupId>
+            <artifactId>wsdl4j</artifactId>
+            <version>${version.wsdl4j}</version>
         </dependency>
         <dependency>
             <groupId>io.swagger.parser.v3</groupId>
             <artifactId>swagger-parser</artifactId>
-            <version>${swagger.parser.version}</version>
+            <version>${version.swagger-parser}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-models</artifactId>
+            <version>${version.swagger-models}</version>
         </dependency>
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>${snakeYaml.version}</version>
+            <version>${version.snakeYaml}</version>
         </dependency>
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${version.jackson-core}</version>
         </dependency>
         <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${version.jackson-annotations}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <version>${version.jackson-dataformat-yaml}</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>${junit.version}</version>
+            <version>${version.junit}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -217,6 +231,24 @@
                     <source>1.8</source>
                     <target>1.8</target>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${version.maven-shade-plugin}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <artifactSet/>
+                            <outputFile>${project.build.directory}/${project.artifactId}-${project.version}-fat.jar
+                            </outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -373,6 +405,53 @@
         </plugins>
     </build>
 
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>${version.maven-project-info-reports-plugin}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>analyze-report</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-report-plugin</artifactId>
+                <reportSets>
+                    <reportSet>
+                        <id>integration-tests</id>
+                        <reports>
+                            <report>failsafe-report-only</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>${versions-maven-plugin}</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>dependency-updates-report</report>
+                            <report>plugin-updates-report</report>
+                            <report>property-updates-report</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+        </plugins>
+    </reporting>
+
     <profiles>
         <profile>
             <id>release</id>
@@ -393,7 +472,7 @@
         </snapshotRepository>
         <site>
             <id>site</id>
-            <url>scm:git:https://github.com/apiportal/abyss-echoserver.git</url>
+            <url>scm:git:https://github.com/apiportal/abyss-spec-transformer.git</url>
         </site>
     </distributionManagement>
 
