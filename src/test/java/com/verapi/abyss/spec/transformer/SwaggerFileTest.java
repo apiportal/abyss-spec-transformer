@@ -1,16 +1,20 @@
 package com.verapi.abyss.spec.transformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.swagger.v3.oas.models.OpenAPI;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 
+import javax.wsdl.Definition;
 import javax.wsdl.WSDLException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Map;
 
 /**
  * @author hakdogan (hakdogan@kodcu.com)
@@ -31,9 +35,28 @@ public class SwaggerFileTest {
     }
 
     @Test
-    public void wsdlTransformWithString() throws IOException, WSDLException {
-        String contents = new String(Files.readAllBytes(Paths.get(WSDL_LOCATION)));
-        final String yamlFile = transformer.transform(DOCUMENT_BASE_URI, contents);
+    public void wsdlTransformWithStringContent() throws IOException, WSDLException {
+        final String content = new String(Files.readAllBytes(Paths.get(WSDL_LOCATION)));
+        final String yamlFile = transformer.transform(DOCUMENT_BASE_URI, content);
         assertFalse(yamlFile.isEmpty());
+    }
+
+    @Test
+    public void mismatcTesthWithURLOrDirectoryPath() throws WSDLException {
+        final Definition definition = transformer.getDefinition(WSDL_LOCATION);
+        final OpenAPI openAPI = transformer.getOpenAPI(definition);
+        Map<String, Object> extensions = (Map<String, Object>) openAPI.getComponents().getExtensions().get("x-messages");
+        assertEquals(definition.getMessages().size(), extensions.size());
+        assertEquals(definition.getServices().size(), openAPI.getServers().size());
+    }
+
+    @Test
+    public void mismatchTestWithStringContent() throws WSDLException, IOException {
+        String content = new String(Files.readAllBytes(Paths.get(WSDL_LOCATION)));
+        final Definition definition = transformer.getDefinition(null, content);
+        final OpenAPI openAPI = transformer.getOpenAPI(definition);
+        Map<String, Object> extensions = (Map<String, Object>) openAPI.getComponents().getExtensions().get("x-messages");
+        assertEquals(definition.getMessages().size(), extensions.size());
+        assertEquals(definition.getServices().size(), openAPI.getServers().size());
     }
 }

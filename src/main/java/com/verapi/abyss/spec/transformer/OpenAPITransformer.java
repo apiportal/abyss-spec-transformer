@@ -112,7 +112,7 @@ public class OpenAPITransformer implements IAbyssTransformer {
     }
 
     /**
-     * @param path url or directory
+     * @param path path url or directory
      * @return yaml file
      * @throws JsonProcessingException encountered problem while processing JSON content
      * throws WSDLException            encountered problem while processing WSDL content
@@ -122,7 +122,7 @@ public class OpenAPITransformer implements IAbyssTransformer {
      */
     @Override
     public String transform(final String path) throws JsonProcessingException, WSDLException {
-        final Definition definition = new WSDLReaderImpl().readWSDL(path);
+        final Definition definition = getDefinition(path);
         final OpenAPI openAPI = getOpenAPI(definition);
         return generateYamlFile(openAPI);
     }
@@ -139,9 +139,30 @@ public class OpenAPITransformer implements IAbyssTransformer {
      */
     @Override
     public String transform(final String documentBaseURI, final String wsdl) throws JsonProcessingException, WSDLException {
-        final Definition definition = new WSDLReaderImpl().readWSDL(documentBaseURI, new InputSource(new StringReader(wsdl)));
+        final Definition definition = getDefinition(documentBaseURI, wsdl);
         final OpenAPI openAPI = getOpenAPI(definition);
         return generateYamlFile(openAPI);
+    }
+
+    /**
+     *
+     * @param path path url or directory
+     * @return definiton of the WSDL
+     * @throws WSDLException encountered problem while processing WSDL content
+     */
+    protected Definition getDefinition(final String path) throws WSDLException {
+       return new WSDLReaderImpl().readWSDL(path);
+    }
+
+    /**
+     *
+     * @param documentBaseURI documentBaseURI URL of the definition of the WSDL it can be null or empty
+     * @param wsdl wsdl content of the WSDL
+     * @return definiton of the WSDL
+     * @throws WSDLException encountered problem while processing WSDL content
+     */
+    protected Definition getDefinition(final String documentBaseURI, final String wsdl) throws WSDLException {
+        return new WSDLReaderImpl().readWSDL(documentBaseURI, new InputSource(new StringReader(wsdl)));
     }
 
     /**
@@ -149,7 +170,7 @@ public class OpenAPITransformer implements IAbyssTransformer {
      * @param definition definiton of the WSDL
      * @return openAPI
      */
-    private OpenAPI getOpenAPI(final Definition definition){
+    protected OpenAPI getOpenAPI(final Definition definition){
 
         final Map<String, Map<String, Object>> portBindingsMap = new HashMap<>();
         final OpenAPI openAPI = new OpenAPI();

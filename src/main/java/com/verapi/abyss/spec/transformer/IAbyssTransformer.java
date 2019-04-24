@@ -33,7 +33,7 @@ public interface IAbyssTransformer {
     /**
      * Transforms the WSDL which given with the path param
      *
-     * @param path url or directory
+     * @param path path url or directory
      * @return yaml file
      * @throws JsonProcessingException encountered problem while processing JSON content
      * @throws WSDLException           encountered problem while processing WSDL content
