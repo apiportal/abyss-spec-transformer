@@ -29,8 +29,9 @@ import javax.wsdl.WSDLException;
  */
 
 public interface IAbyssTransformer {
+
     /**
-     * Transforms the WSDL which given with the definition
+     * Transforms the WSDL which given with the path param
      *
      * @param path url or directory
      * @return yaml file
@@ -38,4 +39,16 @@ public interface IAbyssTransformer {
      * @throws WSDLException           encountered problem while processing WSDL content
      */
     String transform(String path) throws JsonProcessingException, WSDLException;
+
+    /**
+     * Transforms the WSDL which given with the wsdl param
+     *
+     * @param documentBaseURI documentBaseURI URL of the definition of the WSDL it can be null or empty
+     * @param wsdl wsdl content of the WSDL
+     * @return yaml file
+     * @throws JsonProcessingException encountered problem while processing JSON content
+     * @throws WSDLException           encountered problem while processing WSDL content
+     */
+    String transform(String documentBaseURI, String wsdl) throws JsonProcessingException, WSDLException;
+
 }
