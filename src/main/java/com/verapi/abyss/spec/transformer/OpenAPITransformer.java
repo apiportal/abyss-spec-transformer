@@ -1,4 +1,23 @@
-package io.abyss.spec.transformer;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package com.verapi.abyss.spec.transformer;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -29,25 +48,23 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
 import io.swagger.v3.oas.models.*;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import lombok.extern.slf4j.Slf4j;
 import org.w3c.dom.*;
+
 import javax.wsdl.*;
 import javax.wsdl.extensions.ExtensibilityElement;
-import javax.wsdl.xml.WSDLReader;
+import java.io.StringReader;
 import java.util.*;
+
 import io.swagger.v3.oas.models.info.Info;
+import org.xml.sax.InputSource;
 import org.yaml.snakeyaml.Yaml;
 
 /**
  * @author hakdogan (hakdogan@kodcu.com)
- * Created on 2019-04-22
+ * Created on 2019-04-23
  */
 
-@Slf4j
-public class OpenAPITransformer implements IAbyssTransformer
-{
+public class OpenAPITransformer implements IAbyssTransformer {
 
     private static final String SOAP11_SERVICE_DESCRIPTION = "Soap 1.1 Service";
     private static final String SOAP12_SERVICE_DESCRIPTION = "Soap 1.2 Service";
@@ -71,6 +88,9 @@ public class OpenAPITransformer implements IAbyssTransformer
 
     private Map<String, String> dataTypes;
 
+    /**
+     * Constructor.
+     */
     public OpenAPITransformer() {
 
         dataTypes = new HashMap<>();
@@ -92,45 +112,94 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
-     *
-     * @param path
-     * @return
-     * @throws JsonProcessingException
-     * @throws WSDLException
+     * @param path path url or directory
+     * @return yaml file
+     * @throws JsonProcessingException encountered problem while processing JSON content
+     * throws WSDLException            encountered problem while processing WSDL content
+     * @see com.verapi.abyss.spec.transformer.IAbyssTransformer#transform(String)
+     * <p>
+     * Transforms the WSDL which given with the path param
      */
     @Override
-    public JsonObject transform(final String path) throws JsonProcessingException, WSDLException {
+    public String transform(final String path) throws JsonProcessingException, WSDLException {
+        final Definition definition = getDefinition(path);
+        final OpenAPI openAPI = getOpenAPI(definition);
+        return generateYamlFile(openAPI);
+    }
 
-        final WSDLReader wsdlReader = new WSDLReaderImpl();
-        final Definition definition = wsdlReader.readWSDL(path);
-        final Map<String, Map<String, Object>> portBindingNames = new HashMap<>();
-        final OpenAPI openAPI = new OpenAPI();
-
-        resolveServers(definition.getAllServices().values(), portBindingNames, openAPI)
-                .resolveTagsAndSetPaths(definition.getAllBindings().values(), portBindingNames, openAPI)
-                .getSchemas(definition.getTypes(), openAPI)
-                .resolveMessages(definition.getMessages().values(), openAPI)
-                .addRequestBodiesAndResponses(definition.getAllPortTypes().values(), openAPI);
-
-        final String yamlFile = generateYamlFile(openAPI);
-        return new JsonObject().put("warnings", checksum(definition, openAPI)).put("yamlFile", yamlFile);
+    /**
+     * @param documentBaseURI documentBaseURI URL of the definition of the WSDL it can be null or empty
+     * @param wsdl wsdl content of the WSDL
+     * @return
+     * @throws JsonProcessingException encountered problem while processing WSDL content
+     * @throws WSDLException           encountered problem while processing WSDL content
+     * @see com.verapi.abyss.spec.transformer.IAbyssTransformer#transform(String, String)
+     * <p>
+     * Transforms the WSDL which given with the wsdl param
+     */
+    @Override
+    public String transform(final String documentBaseURI, final String wsdl) throws JsonProcessingException, WSDLException {
+        final Definition definition = getDefinition(documentBaseURI, wsdl);
+        final OpenAPI openAPI = getOpenAPI(definition);
+        return generateYamlFile(openAPI);
     }
 
     /**
      *
-     * @param services
-     * @param portBinginNames
-     * @param openAPI
-     * @return
+     * @param path path url or directory
+     * @return definiton of the WSDL
+     * @throws WSDLException encountered problem while processing WSDL content
      */
-    private OpenAPITransformer resolveServers(final Collection<Service> services, final Map<String, Map<String, Object>> portBinginNames,
-                                              final OpenAPI openAPI){
+    protected Definition getDefinition(final String path) throws WSDLException {
+       return new WSDLReaderImpl().readWSDL(path);
+    }
+
+    /**
+     *
+     * @param documentBaseURI documentBaseURI URL of the definition of the WSDL it can be null or empty
+     * @param wsdl wsdl content of the WSDL
+     * @return definiton of the WSDL
+     * @throws WSDLException encountered problem while processing WSDL content
+     */
+    protected Definition getDefinition(final String documentBaseURI, final String wsdl) throws WSDLException {
+        return new WSDLReaderImpl().readWSDL(documentBaseURI, new InputSource(new StringReader(wsdl)));
+    }
+
+    /**
+     *
+     * @param definition definiton of the WSDL
+     * @return openAPI
+     */
+    protected OpenAPI getOpenAPI(final Definition definition){
+
+        final Map<String, Map<String, Object>> portBindingsMap = new HashMap<>();
+        final OpenAPI openAPI = new OpenAPI();
+
+        resolveServers(definition.getAllServices().values(), portBindingsMap, openAPI)
+                .resolveTagsAndSetPaths(definition.getAllBindings().values(), portBindingsMap, openAPI)
+                .getSchemas(definition.getTypes(), openAPI)
+                .resolveMessages(definition.getMessages().values(), openAPI)
+                .addRequestBodiesAndResponses(definition.getAllPortTypes().values(), openAPI);
+
+        return openAPI;
+    }
+
+    /**
+     * Resolves servers from services collection
+     *
+     * @param services        services that are resolved from WSDL
+     * @param portBindingsMap port bindings map include binding definitions, it forwarded to other methods
+     * @param openAPI         opeanAPI
+     * @return OpenAPITransformer
+     */
+    private OpenAPITransformer resolveServers(final Collection<Service> services, final Map<String, Map<String, Object>> portBindingsMap,
+                                              final OpenAPI openAPI) {
         final List<Server> serverList = new ArrayList<>();
         services.forEach(service -> {
             setInformation(service.getQName().getLocalPart(), openAPI);
             Optional.ofNullable(service.getDocumentationElement()).ifPresent(element ->
-                    openAPI.getInfo().setDescription(getDocumantation(element.getChildNodes())));
-            resolvePortsAndBindings(service.getPorts().values(), portBinginNames)
+                    openAPI.getInfo().setDescription(getDocumentation(element.getChildNodes())));
+            resolvePortsAndBindings(service.getPorts().values(), portBindingsMap)
                     .forEach(location -> {
                         final Server server = new Server();
                         server.setUrl((String) location);
@@ -142,62 +211,65 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Iterates ports for resolve binding name and accessing extensibility elements
      *
-     * @param ports
-     * @param portBindingNames
-     * @return
+     * @param ports           ports that are resolved from WSDL
+     * @param portBindingsMap port bindings map include binding definitions, it forwarded to other methods
+     * @return locations list that identify servers
      */
-    private final Set<String> resolvePortsAndBindings(final Collection<Port> ports, final Map<String, Map<String, Object>> portBindingNames){
+    private final Set<String> resolvePortsAndBindings(final Collection<Port> ports, final Map<String, Map<String, Object>> portBindingsMap) {
         final Set<String> locations = new HashSet<>();
-        for(Port port :ports){
-            final String portBindingsName = port.getBinding().getQName().getLocalPart();
-            resolvePortExtensibilityElement(port, portBindingsName, port.getExtensibilityElements(), portBindingNames, locations);
+        for (Port port : ports) {
+            final String bindingName = port.getBinding().getQName().getLocalPart();
+            resolvePortExtensibilityElement(port, bindingName, port.getExtensibilityElements(), portBindingsMap, locations);
         }
 
         return locations;
     }
 
     /**
+     * Iterates extensibility elements for resolve information of soap and http operations
      *
-     * @param port
-     * @param portBindingsName
-     * @param extElements
-     * @param portBinginNames
-     * @param locations
+     * @param port            port it is resolved from WSDL
+     * @param bindingName     binding name
+     * @param extElements     extensibility elements of the port
+     * @param portBindingsMap port bindings map include binding definitions
+     * @param locations       locations list that identify servers
      */
-    private void resolvePortExtensibilityElement(final Port port, final String portBindingsName, final List<ExtensibilityElement> extElements,
-                                                 final Map<String, Map<String, Object>> portBinginNames, final Set<String> locations){
+    private void resolvePortExtensibilityElement(final Port port, final String bindingName, final List<ExtensibilityElement> extElements,
+                                                 final Map<String, Map<String, Object>> portBindingsMap, final Set<String> locations) {
         extElements.forEach(element -> {
             final Map<String, Object> portBinginAttributes = new HashMap<>();
-            if(element instanceof SOAPAddressImpl){
+            if (element instanceof SOAPAddressImpl) {
                 portBinginAttributes.put("url", ((SOAPAddressImpl) element).getLocationURI());
                 portBinginAttributes.put(DESCRIPTION, SOAP11_SERVICE_DESCRIPTION);
                 addOperationsName(port.getBinding().getBindingOperations(), portBinginAttributes);
-                portBinginNames.put(portBindingsName, portBinginAttributes);
+                portBindingsMap.put(bindingName, portBinginAttributes);
                 locations.add(((SOAPAddressImpl) element).getLocationURI());
-            } else if(element instanceof SOAP12AddressImpl){
+            } else if (element instanceof SOAP12AddressImpl) {
                 portBinginAttributes.put("url", ((SOAP12AddressImpl) element).getLocationURI());
                 portBinginAttributes.put(DESCRIPTION, SOAP12_SERVICE_DESCRIPTION);
                 addOperationsName(port.getBinding().getBindingOperations(), portBinginAttributes);
-                portBinginNames.put(portBindingsName, portBinginAttributes);
+                portBindingsMap.put(bindingName, portBinginAttributes);
                 locations.add(((SOAP12AddressImpl) element).getLocationURI());
-            } else if(element instanceof HTTPAddressImpl){
+            } else if (element instanceof HTTPAddressImpl) {
                 portBinginAttributes.put("url", ((HTTPAddressImpl) element).getLocationURI());
                 portBinginAttributes.put(DESCRIPTION, HTTP_SERVICE_DESCRIPTION);
                 addOperationsName(port.getBinding().getBindingOperations(), portBinginAttributes);
-                portBinginNames.put(portBindingsName, portBinginAttributes);
+                portBindingsMap.put(bindingName, portBinginAttributes);
                 locations.add(((HTTPAddressImpl) element).getLocationURI());
             }
         });
     }
 
     /**
+     * Resolves schemas from types which are declared in the WSDL
      *
-     * @param types
-     * @param openAPI
-     * @return
+     * @param types   types it is resolved from WSDL
+     * @param openAPI opeanAPI
+     * @return OpenAPITransformer
      */
-    private OpenAPITransformer getSchemas(final Types types, final OpenAPI openAPI){
+    private OpenAPITransformer getSchemas(final Types types, final OpenAPI openAPI) {
         final Components components = new Components();
         final Map<String, Schema> resolvedSchemas = new HashMap<>();
         Optional.ofNullable(types).ifPresent(type -> {
@@ -214,41 +286,44 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Resolves schemas from types which are included in the WSDL
      *
-     * @param schemaReferences
-     * @param resolvedSchemas
+     * @param schemaReferences schema references includes schemas included in WSDL
+     * @param resolvedSchemas  it contains resolved schemas
      */
-    private void resolveIncludedSchemas(List<SchemaReferenceImpl> schemaReferences, final Map<String, Schema> resolvedSchemas){
+    private void resolveIncludedSchemas(List<SchemaReferenceImpl> schemaReferences, final Map<String, Schema> resolvedSchemas) {
         schemaReferences.forEach(schema -> resolvedSchemas.putAll(saveSchemas(schema.getReferencedSchema().getElement().getChildNodes())));
 
     }
 
     /**
+     * Resolves schemas from types which are imported in the WSDL
      *
-     * @param imports
-     * @param resolvedSchemas
+     * @param imports         imports includes schemas imported in WSDL
+     * @param resolvedSchemas it contains resolved schemas
      */
-    private void resolveImportedSchemas(final Map<String, Vector> imports, final Map<String, Schema> resolvedSchemas){
+    private void resolveImportedSchemas(final Map<String, Vector> imports, final Map<String, Schema> resolvedSchemas) {
         imports.forEach((k, v) ->
-            v.forEach(vector -> {
-                SchemaImportImpl impl = (SchemaImportImpl) vector;
-                Optional.ofNullable(impl.getReferencedSchema()).ifPresent(schema -> resolvedSchemas.putAll(saveSchemas(schema.getElement().getChildNodes())));
-            }));
+                v.forEach(vector -> {
+                    SchemaImportImpl impl = (SchemaImportImpl) vector;
+                    Optional.ofNullable(impl.getReferencedSchema()).ifPresent(schema -> resolvedSchemas.putAll(saveSchemas(schema.getElement().getChildNodes())));
+                }));
     }
 
     /**
+     * Generates schemas map for OpenAPI
      *
-     * @param nodeList
-     * @return
+     * @param nodeList node list child nodes from dom
+     * @return resolved schemas
      */
-    private Map<String, Schema> saveSchemas(final NodeList nodeList){
+    private Map<String, Schema> saveSchemas(final NodeList nodeList) {
         final Map<String, Schema> schemas = new HashMap<>();
-        for(int i=0; i<nodeList.getLength(); i++) {
+        for (int i = 0; i < nodeList.getLength(); i++) {
             final Node parentNode = nodeList.item(i);
             final Schema childComplexTypeSchema = checkComplexTypeInChildNodes(parentNode.getChildNodes());
-            if(null != childComplexTypeSchema){
+            if (null != childComplexTypeSchema) {
                 Optional.ofNullable(childComplexTypeSchema.getName()).ifPresent(name -> schemas.put(name, childComplexTypeSchema));
-            } else if(null != parentNode.getAttributes()) {
+            } else if (null != parentNode.getAttributes()) {
                 final Schema schema = parseAttributes(parentNode);
                 Optional.ofNullable(schema.getName()).ifPresent(name -> schemas.put(name, schema));
             }
@@ -258,14 +333,15 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Resolves complex type
      *
-     * @param nodeList
-     * @return
+     * @param nodeList node list
+     * @return schema
      */
-    private Schema checkComplexTypeInChildNodes(final NodeList nodeList){
-        for(int i=0; i<nodeList.getLength(); i++){
+    private Schema checkComplexTypeInChildNodes(final NodeList nodeList) {
+        for (int i = 0; i < nodeList.getLength(); i++) {
             Node node = nodeList.item(i);
-            if(node.getNodeName().contains("complexType")){
+            if (node.getNodeName().contains("complexType")) {
                 final Schema schema = new Schema();
                 schema.setName(node.getParentNode().getAttributes().item(0).getNodeValue());
                 schema.setType(OBJECT_TYPE);
@@ -278,38 +354,40 @@ public class OpenAPITransformer implements IAbyssTransformer
 
 
     /**
+     * Resolves given node
      *
-     * @param parentNode
-     * @return
+     * @param parentNode parent node
+     * @return schema
      */
-    private Schema parseAttributes(final Node parentNode){
+    private Schema parseAttributes(final Node parentNode) {
         final Schema schema = new Schema();
         final NamedNodeMap namedNodeMap = parentNode.getAttributes();
-        for(int i=0; i<namedNodeMap.getLength(); i++){
+        for (int i = 0; i < namedNodeMap.getLength(); i++) {
             final Node node = namedNodeMap.item(i);
-            if(parentNode.getNodeName().contains("complexType")){
+            if (parentNode.getNodeName().contains("complexType")) {
                 schema.setType(OBJECT_TYPE);
                 parseComplexType(schema, parentNode);
-            } else if(parentNode.getNodeName().contains("simpleType")){
+            } else if (parentNode.getNodeName().contains("simpleType")) {
                 parseSimpleTypeObject(schema, parentNode.getChildNodes());
             }
-            setSchemaDefination(schema, node);
+            setSchemaDefinition(schema, node);
         }
         return schema;
     }
 
     /**
+     * Parsing complex type
      *
-     * @param schema
-     * @param complexType
+     * @param schema      schema
+     * @param complexType complex type
      */
-    private void parseComplexType(final Schema schema, final Node complexType){
+    private void parseComplexType(final Schema schema, final Node complexType) {
         NodeList complexTypeChildren = complexType.getChildNodes();
-        for(int i=0; i<complexTypeChildren.getLength(); i++){
+        for (int i = 0; i < complexTypeChildren.getLength(); i++) {
             Node childNode = complexTypeChildren.item(i);
-            if(childNode.getNextSibling() != null){
+            if (childNode.getNextSibling() != null) {
                 Node sibling = childNode.getNextSibling();
-                if(sibling.getChildNodes().getLength() > 0){
+                if (sibling.getChildNodes().getLength() > 0) {
                     resolveSiblingChildNodes(schema, sibling.getChildNodes());
                 }
             }
@@ -317,18 +395,19 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Parsing simple type
      *
-     * @param schema
-     * @param nodeList
+     * @param schema   schema
+     * @param nodeList node list
      */
-    private void parseSimpleTypeObject(final Schema schema, final NodeList nodeList){
-        for(int i=0; i<nodeList.getLength(); i++){
+    private void parseSimpleTypeObject(final Schema schema, final NodeList nodeList) {
+        for (int i = 0; i < nodeList.getLength(); i++) {
             final Node node = nodeList.item(i);
-            if(node.getNodeName().contains("restriction")){
+            if (node.getNodeName().contains("restriction")) {
                 final NamedNodeMap restrictionNodeMap = node.getAttributes();
-                for(int j=0; j<restrictionNodeMap.getLength(); j++){
+                for (int j = 0; j < restrictionNodeMap.getLength(); j++) {
                     final Node restrictionNode = restrictionNodeMap.item(j);
-                    if(restrictionNode.getNodeName().equals("base")){
+                    if (restrictionNode.getNodeName().equals("base")) {
                         final String type = restrictionNode.getNodeValue();
                         schema.setType(type.substring(type.indexOf(':') + 1));
                     }
@@ -338,44 +417,47 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Resolves sibling childs
      *
-     * @param siblingChilds
+     * @param siblingChilds sibling childs
      */
-    private void resolveSiblingChildNodes(final Schema schema, final NodeList siblingChilds){
-        for(int i=0; i<siblingChilds.getLength(); i++){
+    private void resolveSiblingChildNodes(final Schema schema, final NodeList siblingChilds) {
+        for (int i = 0; i < siblingChilds.getLength(); i++) {
             Node sequenceNode = siblingChilds.item(i);
-            if(sequenceNode.getAttributes() != null && sequenceNode.getAttributes().getLength() > 0){
+            if (sequenceNode.getAttributes() != null && sequenceNode.getAttributes().getLength() > 0) {
                 resolveSequenceNodeMap(schema, sequenceNode.getAttributes());
             }
         }
     }
 
     /**
+     * Resolves sequence node map
      *
-     * @param schema
-     * @param sequenceNodeMap
+     * @param schema          schema
+     * @param sequenceNodeMap sequence node map
      */
-    private void resolveSequenceNodeMap(final Schema schema, final NamedNodeMap sequenceNodeMap){
-        for(int i = 0; i<sequenceNodeMap.getLength(); i++){
+    private void resolveSequenceNodeMap(final Schema schema, final NamedNodeMap sequenceNodeMap) {
+        for (int i = 0; i < sequenceNodeMap.getLength(); i++) {
             Node element = sequenceNodeMap.item(i);
-            if(element.getNodeName().equals("type")){
+            if (element.getNodeName().equals("type")) {
                 setRequiredItemsAndPropertiesOnSchema(schema, sequenceNodeMap, element);
             }
         }
     }
 
     /**
+     * Sets the required elements and properties in the schema
      *
-     * @param schema
-     * @param namedNodeMap
-     * @param node
+     * @param schema       schema
+     * @param namedNodeMap named node map
+     * @param node         node
      */
-    private void setRequiredItemsAndPropertiesOnSchema(final Schema schema, final NamedNodeMap namedNodeMap, final Node node){
-        for(int j=0; j<namedNodeMap.getLength();j++){
-            if(namedNodeMap.item(j).getNodeName().equals("name")){
+    private void setRequiredItemsAndPropertiesOnSchema(final Schema schema, final NamedNodeMap namedNodeMap, final Node node) {
+        for (int j = 0; j < namedNodeMap.getLength(); j++) {
+            if (namedNodeMap.item(j).getNodeName().equals("name")) {
                 schema.addRequiredItem(namedNodeMap.item(j).getNodeValue());
                 final String type = node.getNodeValue().substring(node.getNodeValue().indexOf(':') + 1);
-                if(null == dataTypes.get(type)){
+                if (null == dataTypes.get(type)) {
                     schema.addProperties(namedNodeMap.item(j).getNodeValue(), getReferenceItem(type));
                 } else {
                     schema.addProperties(namedNodeMap.item(j).getNodeValue(), getPropertyItem(dataTypes.get(type)));
@@ -385,17 +467,18 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Sets the schema definition
      *
-     * @param schema
-     * @param node
+     * @param schema schema
+     * @param node   node
      */
-    private void setSchemaDefination(final Schema schema, final Node node){
-        if(node.getNodeName().equals("name")){
+    private void setSchemaDefinition(final Schema schema, final Node node) {
+        if (node.getNodeName().equals("name")) {
             schema.setName(node.getNodeValue());
             schema.setTitle(node.getNodeValue());
-        } else if(node.getNodeName().equals("type")){
+        } else if (node.getNodeName().equals("type")) {
             final String type = node.getNodeValue().substring(node.getNodeValue().indexOf(':') + 1);
-            if(null != dataTypes.get(type)){
+            if (null != dataTypes.get(type)) {
                 schema.setType(dataTypes.get(type));
             } else {
                 schema.setType(OBJECT_TYPE);
@@ -406,34 +489,37 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Returns reference item for the schema
      *
-     * @param type
-     * @return
+     * @param type type
+     * @return schema
      */
-    private Schema getReferenceItem(final String type){
+    private Schema getReferenceItem(final String type) {
         final Schema referenceItem = new Schema();
         referenceItem.set$ref(type);
         return referenceItem;
     }
 
     /**
+     * Returns property item for the schema
      *
-     * @param type
-     * @return
+     * @param type type
+     * @return schema
      */
-    private Schema getPropertyItem(final String type){
+    private Schema getPropertyItem(final String type) {
         final Schema propertyItem = new Schema();
         propertyItem.setType(type);
         return propertyItem;
     }
 
     /**
+     * Resolves messages which are declared in the WSDL
      *
-     * @param messages
-     * @param openAPI
-     * @return
+     * @param messages messages that are resolved from WSDL
+     * @param openAPI  openAPI
+     * @return OpenAPITransformer
      */
-    private OpenAPITransformer resolveMessages(final Collection<Message> messages, final OpenAPI openAPI){
+    private OpenAPITransformer resolveMessages(final Collection<Message> messages, final OpenAPI openAPI) {
         final Map<String, Object> extensions = new HashMap<>();
         final Map<String, Schema> schemaMap = openAPI.getComponents().getSchemas();
 
@@ -443,7 +529,7 @@ public class OpenAPITransformer implements IAbyssTransformer
             attributes.put("$ref", "#/components/schemas/" + messageName);
             extensions.put(messageName, attributes);
 
-            if(null == schemaMap.get(messageName)){
+            if (null == schemaMap.get(messageName)) {
                 final Schema schema = new Schema();
                 schema.setName(messageName);
                 schema.setTitle(messageName);
@@ -465,17 +551,18 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Generates schemas for message extensions
      *
-     * @param schema
-     * @param itemName
-     * @param type
-     * @param schemaMap
+     * @param schema    schema
+     * @param itemName  item name
+     * @param type      type
+     * @param schemaMap schema map
      */
-    private void getSchemaForMessages(final Schema schema, final String itemName, final String type, final Map<String, Schema> schemaMap){
+    private void getSchemaForMessages(final Schema schema, final String itemName, final String type, final Map<String, Schema> schemaMap) {
 
         schema.addRequiredItem(itemName);
         Schema propertyItem = new Schema();
-        if(null != schemaMap.get(type)){
+        if (null != schemaMap.get(type)) {
             propertyItem.set$ref("#/components/schemas/" + type);
         } else {
             propertyItem = getPropertyItem(dataTypes.get(type));
@@ -484,17 +571,18 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Resolves tags and paths from bindings for Open API
      *
-     * @param bindings
-     * @param portBindingNames
-     * @param openAPI
+     * @param bindings        bindings that are resolved from WSDL
+     * @param portBindingsMap port bindings map include binding definitions
+     * @param openAPI         openAPI
      */
-    private OpenAPITransformer resolveTagsAndSetPaths(final Collection<Binding> bindings, final Map<String, Map<String, Object>> portBindingNames, final OpenAPI openAPI){
+    private OpenAPITransformer resolveTagsAndSetPaths(final Collection<Binding> bindings, final Map<String, Map<String, Object>> portBindingsMap, final OpenAPI openAPI) {
         final List<Tag> tagList = new ArrayList<>();
-        final Map<String, Map<String, Object>>  discoveredPathsMap = new HashMap<>();
+        final Map<String, Map<String, Object>> discoveredPathsMap = new HashMap<>();
         bindings.forEach(binding -> {
             final String httpMethod = resolveHttpMethod(binding.getExtensibilityElements());
-            final Map<String, Object> tagAttributes = portBindingNames.get(binding.getQName().getLocalPart());
+            final Map<String, Object> tagAttributes = portBindingsMap.get(binding.getQName().getLocalPart());
             Optional.ofNullable(tagAttributes).ifPresent(attributes -> {
                 final Tag tag = new Tag();
                 final ExternalDocumentation externalDocs = new ExternalDocumentation();
@@ -504,7 +592,7 @@ public class OpenAPITransformer implements IAbyssTransformer
                 externalDocs.setDescription((String) attributes.get(DESCRIPTION));
                 tagList.add(tag);
             });
-            discoverPaths(httpMethod, binding.getBindingOperations(), portBindingNames, discoveredPathsMap);
+            discoverPaths(httpMethod, binding.getBindingOperations(), portBindingsMap, discoveredPathsMap);
         });
 
         openAPI.setTags(tagList);
@@ -513,14 +601,15 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Resolves http method HTTPBindingImpl
      *
-     * @param exElements
-     * @return
+     * @param exElements exElements list of extensibility element
+     * @return http method
      */
-    private String resolveHttpMethod(final List<ExtensibilityElement> exElements){
+    private String resolveHttpMethod(final List<ExtensibilityElement> exElements) {
         String httpMethod = "post";
-        for(ExtensibilityElement element :exElements){
-            if(element instanceof HTTPBindingImpl){
+        for (ExtensibilityElement element : exElements) {
+            if (element instanceof HTTPBindingImpl) {
                 httpMethod = ((HTTPBindingImpl) element).getVerb().toLowerCase();
             }
         }
@@ -528,30 +617,31 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Discovers paths from binding operations for Open API
      *
-     * @param httpMethod
-     * @param bindingOperations
-     * @param portBindingNames
-     * @param discoveredPaths
+     * @param httpMethod        http method
+     * @param bindingOperations binding operations that are resolved from the WSDL
+     * @param portBindingsMap   port bindings map include binding definitions
+     * @param discoveredPaths   discovered paths include paths
      */
     private void discoverPaths(final String httpMethod, final List<BindingOperationImpl> bindingOperations,
-                               final Map<String, Map<String, Object>> portBindingNames, final Map<String, Map<String, Object>> discoveredPaths){
-        for(BindingOperationImpl impl :bindingOperations){
+                               final Map<String, Map<String, Object>> portBindingsMap, final Map<String, Map<String, Object>> discoveredPaths) {
+        for (BindingOperationImpl impl : bindingOperations) {
             final List<ExtensibilityElement> exList = impl.getExtensibilityElements();
             Map<String, Object> pathAttributes;
-            for(ExtensibilityElement element :exList){
-                if(element instanceof SOAPOperationImpl || element instanceof SOAP12OperationImpl){
+            for (ExtensibilityElement element : exList) {
+                if (element instanceof SOAPOperationImpl || element instanceof SOAP12OperationImpl) {
                     pathAttributes = setPathAttributes("SoapService", impl.getName(), httpMethod,
                             impl.getOperation().getInput().getMessage(), impl.getOperation().getOutput().getMessage(),
                             impl.getOperation().getFaults());
 
-                    addPathTags(impl.getName(), "soap", pathAttributes, portBindingNames);
+                    addPathTags(impl.getName(), "soap", pathAttributes, portBindingsMap);
                     discoveredPaths.put(impl.getName(), pathAttributes);
-                } else if(element instanceof HTTPOperationImpl){
+                } else if (element instanceof HTTPOperationImpl) {
                     pathAttributes = setPathAttributes("HttpService", impl.getName(), httpMethod,
                             impl.getOperation().getInput().getMessage(), impl.getOperation().getOutput().getMessage(),
                             impl.getOperation().getFaults());
-                    addPathTags(impl.getName(), "http", pathAttributes, portBindingNames);
+                    addPathTags(impl.getName(), "http", pathAttributes, portBindingsMap);
                     discoveredPaths.put(((HTTPOperationImpl) element).getLocationURI(), pathAttributes);
                 }
             }
@@ -559,23 +649,24 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Defines path attributes for Open API
      *
-     * @param description
-     * @param operationName
-     * @param httpMethod
-     * @param inputMessage
-     * @param outputMessage
-     * @param faultMap
-     * @return
+     * @param description   path description
+     * @param operationName operation name
+     * @param httpMethod    http method
+     * @param inputMessage  input message
+     * @param outputMessage output message
+     * @param faultMap      fault map
+     * @return path attributes
      */
     private final Map<String, Object> setPathAttributes(final String description, final String operationName, final String httpMethod,
-                                                        final Message inputMessage, final Message outputMessage, final Map<String, Fault> faultMap){
+                                                        final Message inputMessage, final Message outputMessage, final Map<String, Fault> faultMap) {
         final Map<String, Object> pathAttributes = new HashMap<>();
         pathAttributes.put(DESCRIPTION, description);
         pathAttributes.put("operation", operationName);
         pathAttributes.put("method", httpMethod);
 
-        Optional.ofNullable(inputMessage).ifPresent(message ->  pathAttributes.put(REQUEST_BODY_KEY, message.getQName().getLocalPart()));
+        Optional.ofNullable(inputMessage).ifPresent(message -> pathAttributes.put(REQUEST_BODY_KEY, message.getQName().getLocalPart()));
         Optional.ofNullable(outputMessage).ifPresent(message -> pathAttributes.put(RESPONSE_KEY, message.getQName().getLocalPart()));
         pathAttributes.put("faults", !faultMap.isEmpty());
 
@@ -583,28 +674,29 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Defines tags for paths
      *
-     * @param operationName
-     * @param requestType
-     * @param pathAttributes
-     * @param portBindingNames
+     * @param operationName   operation name
+     * @param requestType     request type
+     * @param pathAttributes  path attributes
+     * @param portBindingsMap port bindings map include binding definitions
      */
     private void addPathTags(final String operationName, final String requestType,
-                             final Map<String, Object> pathAttributes, final Map<String, Map<String, Object>> portBindingNames){
-        portBindingNames.forEach((key, value) -> {
+                             final Map<String, Object> pathAttributes, final Map<String, Map<String, Object>> portBindingsMap) {
+        portBindingsMap.forEach((key, value) -> {
             final Map<String, Object> attributes = value;
             attributes.forEach((k, v) -> {
-                if(k.equals("operations")){
+                if (k.equals("operations")) {
                     final List<String> names = (List<String>) v;
                     final List<String> tags = null != pathAttributes.get("tags")
-                            ?(List<String>) pathAttributes.get("tags"):new ArrayList<>();
+                            ? (List<String>) pathAttributes.get("tags") : new ArrayList<>();
                     final Set<String> locations = null != pathAttributes.get(LOCATIONS_KEY)
-                            ?(Set<String>) pathAttributes.get(LOCATIONS_KEY):new HashSet<>();
+                            ? (Set<String>) pathAttributes.get(LOCATIONS_KEY) : new HashSet<>();
                     names.forEach(n -> {
                         final String desc = value.get(DESCRIPTION).toString().toLowerCase();
-                        if(n.equals(operationName) && desc.contains(requestType)){
-                                tags.add(key);
-                                locations.add((String) value.get("url"));
+                        if (n.equals(operationName) && desc.contains(requestType)) {
+                            tags.add(key);
+                            locations.add((String) value.get("url"));
                         }
                         pathAttributes.put("tags", tags);
                         pathAttributes.put(LOCATIONS_KEY, locations);
@@ -615,13 +707,14 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Resolves documadocumentationntation information from WSDL
      *
-     * @param nodeList
-     * @return
+     * @param nodeList node list
+     * @return documentation information
      */
-    private String getDocumantation(final NodeList nodeList){
+    private String getDocumentation(final NodeList nodeList) {
         String data = "";
-        for(int i=0; i<nodeList.getLength(); i++){
+        for (int i = 0; i < nodeList.getLength(); i++) {
             final Node node = nodeList.item(i);
             data = Optional.ofNullable(((DeferredTextImpl) node).getData()).orElse("");
         }
@@ -631,11 +724,12 @@ public class OpenAPITransformer implements IAbyssTransformer
 
 
     /**
+     * Sets documentation information on Open API
      *
-     * @param title
-     * @param openAPI
+     * @param title   title
+     * @param openAPI openAPI
      */
-    private void setInformation(final String title, final OpenAPI openAPI){
+    private void setInformation(final String title, final OpenAPI openAPI) {
         Info info = new Info();
         info.setTitle(title);
         info.setVersion(DEFAULT_INFORMATION_VERSION);
@@ -643,22 +737,24 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Adds operation name on por port binding attributes map
      *
-     * @param bindingOperations
-     * @param portBinginAttributes
+     * @param bindingOperations     binding operations
+     * @param portBindingAttributes port binding attributes
      */
-    private void addOperationsName(final List<BindingOperation> bindingOperations, final Map<String, Object> portBinginAttributes){
+    private void addOperationsName(final List<BindingOperation> bindingOperations, final Map<String, Object> portBindingAttributes) {
         final List<String> names = new ArrayList<>();
         bindingOperations.forEach(operation -> names.add(operation.getName()));
-        portBinginAttributes.put("operations", names);
+        portBindingAttributes.put("operations", names);
     }
 
     /**
+     * Sets paths on Open API
      *
-     * @param discoveredPathsMap
-     * @param openAPI
+     * @param discoveredPathsMap discovered paths map
+     * @param openAPI            openAPI
      */
-    private void setPaths(final Map<String, Map<String, Object>>  discoveredPathsMap, final OpenAPI openAPI){
+    private void setPaths(final Map<String, Map<String, Object>> discoveredPathsMap, final OpenAPI openAPI) {
 
         final Paths paths = new Paths();
         discoveredPathsMap.forEach((k, v) -> {
@@ -678,29 +774,31 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Returns request body for Open API
      *
-     * @param bodyName
-     * @return
+     * @param bodyName body name
+     * @return RequestBody
      */
-    private RequestBody getRequestBodyForPath(final String bodyName){
+    private RequestBody getRequestBodyForPath(final String bodyName) {
         final RequestBody requestBody = new RequestBody();
         requestBody.set$ref("#/components/requestBodies/" + bodyName);
         return requestBody;
     }
 
     /**
+     * Returns api responses for Open API
      *
-     * @param response
-     * @param faults
-     * @return
+     * @param response response
+     * @param faults   faults
+     * @return ApiResponses
      */
-    private ApiResponses getApiResponseForPath(final String response, final boolean faults){
+    private ApiResponses getApiResponseForPath(final String response, final boolean faults) {
         final ApiResponses apiResponses = new ApiResponses();
         final ApiResponse okResponse = new ApiResponse();
         okResponse.set$ref("#/components/responses/200_" + response);
         apiResponses.addApiResponse(DEFAULT_SUCCESS_RESPONSE_CODE, okResponse);
 
-        if(faults){
+        if (faults) {
             final ApiResponse faultResponse = new ApiResponse();
             faultResponse.set$ref(DEFAULT_FAULT_RESPONSE_REF);
             apiResponses.addApiResponse(DEFAULT_FAULT_RESPONSE_CODE, faultResponse);
@@ -710,13 +808,14 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Returns path item for Open API
      *
-     * @param httpMetod
-     * @return
+     * @param httpMethod http method
+     * @return PathItem
      */
-    private PathItem getPathItem(final String httpMetod, final Operation operation){
+    private PathItem getPathItem(final String httpMethod, final Operation operation) {
         final PathItem pathItem = new PathItem();
-        switch (httpMetod){
+        switch (httpMethod) {
             case "get":
                 pathItem.setGet(operation);
                 break;
@@ -738,12 +837,13 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Overrides servers on paths if more than one
      *
-     * @param servers
-     * @param pathItem
+     * @param servers  servers
+     * @param pathItem path item
      */
-    private void overrideServersIfMoreThanOne(final List<Server> servers, final Set<String> location, final PathItem pathItem){
-        if(servers.size() > 1){
+    private void overrideServersIfMoreThanOne(final List<Server> servers, final Set<String> location, final PathItem pathItem) {
+        if (servers.size() > 1) {
             final List<Server> serverList = new ArrayList<>();
             location.forEach(s -> {
                 final Server server = new Server();
@@ -756,25 +856,26 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Adds request bodies and responses on Open API
      *
-     * @param portTypes
-     * @param openAPI
-     * @return
+     * @param portTypes port types
+     * @param openAPI   openAPI
+     * @return OpenAPITransformer
      */
-    private OpenAPITransformer addRequestBodiesAndResponses(final Collection<PortType> portTypes, final OpenAPI openAPI){
+    private OpenAPITransformer addRequestBodiesAndResponses(final Collection<PortType> portTypes, final OpenAPI openAPI) {
         final Optional<Map<String, Object>> componentExt = Optional.ofNullable(openAPI.getComponents().getExtensions());
         componentExt.ifPresent(ext -> {
             final Map<String, Object> extensions = (Map<String, Object>) ext.get(MESSAGE_EXTENSIONS);
-            for(PortType portType :portTypes){
+            for (PortType portType : portTypes) {
                 final List<javax.wsdl.Operation> operations = portType.getOperations();
-                for(javax.wsdl.Operation operation :operations){
-                    if(null != operation.getInput().getMessage()) {
+                for (javax.wsdl.Operation operation : operations) {
+                    if (null != operation.getInput().getMessage()) {
                         addRequestBodies(operation.getInput().getMessage().getQName().getLocalPart(), extensions, openAPI);
                     }
-                    if(null != operation.getOutput().getMessage()) {
+                    if (null != operation.getOutput().getMessage()) {
                         addResponses(operation.getOutput().getMessage().getQName().getLocalPart(), extensions, openAPI);
                     }
-                    if(!operation.getFaults().isEmpty()){
+                    if (!operation.getFaults().isEmpty()) {
                         addFaultResponses(operation.getFaults(), openAPI);
                     }
                 }
@@ -785,13 +886,14 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Adds request bodies on Open API
      *
-     * @param bodyName
-     * @param extensions
-     * @param openAPI
+     * @param bodyName   body name
+     * @param extensions extensions
+     * @param openAPI    openAPI
      */
-    private void addRequestBodies(final String bodyName, final Map<String, Object> extensions, final OpenAPI openAPI){
-        if(null != extensions.get(bodyName)){
+    private void addRequestBodies(final String bodyName, final Map<String, Object> extensions, final OpenAPI openAPI) {
+        if (null != extensions.get(bodyName)) {
             final RequestBody requestBody = new RequestBody();
             final Schema bodySchema = new Schema();
             requestBody.setDescription(bodyName + " message object as request body");
@@ -803,24 +905,26 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Adds responses on Open API
      *
-     * @param responseName
-     * @param extensions
-     * @param openAPI
+     * @param responseName response name
+     * @param extensions   extensions
+     * @param openAPI      openAPI
      */
-    private void addResponses(final String responseName, final Map<String, Object> extensions, final OpenAPI openAPI){
-        if(null != extensions.get(responseName)){
+    private void addResponses(final String responseName, final Map<String, Object> extensions, final OpenAPI openAPI) {
+        if (null != extensions.get(responseName)) {
             openAPI.getComponents().addResponses(String.join("_", DEFAULT_SUCCESS_RESPONSE_CODE, responseName), getResponse(responseName, "Successful operation"));
         }
     }
 
     /**
+     * Returns api response
      *
-     * @param name
-     * @param description
-     * @return
+     * @param name        name
+     * @param description description
+     * @return ApiResponse
      */
-    private ApiResponse getResponse(final String name, final String description){
+    private ApiResponse getResponse(final String name, final String description) {
         final ApiResponse apiResponse = new ApiResponse();
         final Schema responseSchema = new Schema();
         responseSchema.set$ref(MESSAGE_EXTENSIONS_PREFIX + name);
@@ -831,18 +935,19 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Adds fault responses on Open API
      *
-     * @param faultMap
-     * @param openAPI
+     * @param faultMap fault map
+     * @param openAPI  openAPI
      */
-    private void addFaultResponses(final Map<String, Fault> faultMap, final OpenAPI openAPI){
+    private void addFaultResponses(final Map<String, Fault> faultMap, final OpenAPI openAPI) {
         final ComposedSchema composedSchema = new ComposedSchema();
         faultMap.forEach((k, v) ->
-            Optional.ofNullable(v.getMessage().getQName()).ifPresent(q -> {
-                final Schema schema = new Schema();
-                schema.set$ref("#/components/" + MESSAGE_EXTENSIONS + "/" + q.getLocalPart());
-                composedSchema.addOneOfItem(schema);
-            }));
+                Optional.ofNullable(v.getMessage().getQName()).ifPresent(q -> {
+                    final Schema schema = new Schema();
+                    schema.set$ref("#/components/" + MESSAGE_EXTENSIONS + "/" + q.getLocalPart());
+                    composedSchema.addOneOfItem(schema);
+                }));
 
         final ApiResponse faultResponse = new ApiResponse();
         faultResponse.setDescription("Fault Error");
@@ -851,10 +956,11 @@ public class OpenAPITransformer implements IAbyssTransformer
     }
 
     /**
+     * Returns yaml file
      *
-     * @param openAPI
-     * @return
-     * @throws JsonProcessingException
+     * @param openAPI openAPI
+     * @return yaml file
+     * @throws JsonProcessingException encountered problem while processing JSON content
      */
     private String generateYamlFile(final OpenAPI openAPI) throws JsonProcessingException {
         final YAMLFactory yamlFactory = new YAMLFactory()
@@ -875,80 +981,5 @@ public class OpenAPITransformer implements IAbyssTransformer
         components.put(MESSAGE_EXTENSIONS, messages);
 
         return yamlMapper.writeValueAsString(yamlFile);
-    }
-
-    /**
-     *
-     * @param definition
-     * @param openAPI
-     * @return
-     */
-    private JsonArray checksum(final Definition definition, final OpenAPI openAPI){
-
-        final JsonArray warnings = new JsonArray();
-        final Types types = definition.getTypes();
-        if(null != types){
-            final List<SchemaImpl> exElements = types.getExtensibilityElements();
-            exElements.forEach(element -> {
-                final List<SchemaReferenceImpl> schemaReferences = element.getIncludes();
-                schemaReferences.forEach(schema ->
-                        getWarningsForElementNodes(schema.getReferencedSchema().getElement().getChildNodes(), warnings, openAPI));
-
-                final Map<String, Vector> importSchemas = element.getImports();
-                importSchemas.forEach((k, v) ->
-                        v.forEach(vector -> {
-                            SchemaImportImpl impl = (SchemaImportImpl) vector;
-                            Optional.ofNullable(impl.getReferencedSchema()).ifPresent(schema ->
-                                    getWarningsForElementNodes(schema.getElement().getChildNodes(), warnings, openAPI));
-                        }));
-                getWarningsForElementNodes(element.getElement().getChildNodes(), warnings, openAPI);
-            });
-        } else {
-            warnings.add("No schema found in wsdl file!");
-        }
-
-        final Map<String, HashMap> messages = (Map<String, HashMap>) openAPI.getComponents().getExtensions().get(MESSAGE_EXTENSIONS);
-
-        if(messages.isEmpty()){
-            warnings.add("Failed to resolve messages!");
-        }
-        messages.forEach((k, v) -> {
-            if(!openAPI.getComponents().getSchemas().containsKey(k)){
-                warnings.add("Failed to resolve " + k + " scheme!");
-            }
-        });
-
-        if(openAPI.getServers().isEmpty()){
-            warnings.add("Failed to resolve services!");
-        }
-
-        if(openAPI.getPaths().isEmpty()){
-            warnings.add("Failed to resolve paths!");
-        }
-
-        return warnings;
-    }
-
-    /**
-     *
-     * @param nodeList
-     * @param warnings
-     * @param openAPI
-     */
-    private void getWarningsForElementNodes(final NodeList nodeList, final JsonArray warnings, final OpenAPI openAPI){
-        for(int i=0; i<nodeList.getLength(); i++){
-            Node node = nodeList.item(i);
-            if(node.getNodeType() == Node.ELEMENT_NODE){
-                NamedNodeMap list = node.getAttributes();
-                for(int j=0; j<list.getLength(); j++){
-                    Node jNode = list.item(j);
-                    if(jNode.getNodeName().equals("name")
-                            && !openAPI.getComponents().getSchemas().containsKey(jNode.getNodeValue())){
-                        warnings.add("Failed to resolve " + jNode.getNodeValue() + " scheme!");
-                    }
-                }
-            }
-
-        }
     }
 }
