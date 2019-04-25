@@ -52,9 +52,11 @@ import org.w3c.dom.*;
 
 import javax.wsdl.*;
 import javax.wsdl.extensions.ExtensibilityElement;
+import java.io.StringReader;
 import java.util.*;
 
 import io.swagger.v3.oas.models.info.Info;
+import org.xml.sax.InputSource;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -110,17 +112,66 @@ public class OpenAPITransformer implements IAbyssTransformer {
     }
 
     /**
-     * @param path url or directory
+     * @param path path url or directory
      * @return yaml file
      * @throws JsonProcessingException encountered problem while processing JSON content
+     * throws WSDLException            encountered problem while processing WSDL content
      * @see com.verapi.abyss.spec.transformer.IAbyssTransformer#transform(String)
      * <p>
-     * Transforms the WSDL which defined with the path param
+     * Transforms the WSDL which given with the path param
      */
     @Override
     public String transform(final String path) throws JsonProcessingException, WSDLException {
+        final Definition definition = getDefinition(path);
+        final OpenAPI openAPI = getOpenAPI(definition);
+        return generateYamlFile(openAPI);
+    }
 
-        final Definition definition = new WSDLReaderImpl().readWSDL(path);
+    /**
+     * @param documentBaseURI documentBaseURI URL of the definition of the WSDL it can be null or empty
+     * @param wsdl wsdl content of the WSDL
+     * @return
+     * @throws JsonProcessingException encountered problem while processing WSDL content
+     * @throws WSDLException           encountered problem while processing WSDL content
+     * @see com.verapi.abyss.spec.transformer.IAbyssTransformer#transform(String, String)
+     * <p>
+     * Transforms the WSDL which given with the wsdl param
+     */
+    @Override
+    public String transform(final String documentBaseURI, final String wsdl) throws JsonProcessingException, WSDLException {
+        final Definition definition = getDefinition(documentBaseURI, wsdl);
+        final OpenAPI openAPI = getOpenAPI(definition);
+        return generateYamlFile(openAPI);
+    }
+
+    /**
+     *
+     * @param path path url or directory
+     * @return definiton of the WSDL
+     * @throws WSDLException encountered problem while processing WSDL content
+     */
+    protected Definition getDefinition(final String path) throws WSDLException {
+       return new WSDLReaderImpl().readWSDL(path);
+    }
+
+    /**
+     *
+     * @param documentBaseURI documentBaseURI URL of the definition of the WSDL it can be null or empty
+     * @param wsdl wsdl content of the WSDL
+     * @return definiton of the WSDL
+     * @throws WSDLException encountered problem while processing WSDL content
+     */
+    protected Definition getDefinition(final String documentBaseURI, final String wsdl) throws WSDLException {
+        return new WSDLReaderImpl().readWSDL(documentBaseURI, new InputSource(new StringReader(wsdl)));
+    }
+
+    /**
+     *
+     * @param definition definiton of the WSDL
+     * @return openAPI
+     */
+    protected OpenAPI getOpenAPI(final Definition definition){
+
         final Map<String, Map<String, Object>> portBindingsMap = new HashMap<>();
         final OpenAPI openAPI = new OpenAPI();
 
@@ -130,7 +181,7 @@ public class OpenAPITransformer implements IAbyssTransformer {
                 .resolveMessages(definition.getMessages().values(), openAPI)
                 .addRequestBodiesAndResponses(definition.getAllPortTypes().values(), openAPI);
 
-        return generateYamlFile(openAPI);
+        return openAPI;
     }
 
     /**
