@@ -1,0 +1,35 @@
+<settings>
+    <profiles>
+        <profile>
+            <id>sonatype-oss-release</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <gpg.keyname>${env.GPG_ID}</gpg.keyname>
+                <passphraseServerId>${gpg.keyname}</passphraseServerId>
+            </properties>
+        </profile>
+    </profiles>
+    <servers>
+        <server>
+            <id>${env.GPG_ID}</id>
+            <passphrase>${env.GPG_PASSPHRASE}</passphrase>
+        </server>
+        <server>
+            <id>github</id>
+            <username>${env.GITHUB_USERNAME}</username>
+            <password>${env.GITHUB_PASSWORD}</password>
+        </server>
+        <server>
+            <id>sonatype-nexus-snapshots</id>
+            <username>${env.SONATYPE_USERNAME}</username>
+            <password>${env.SONATYPE_PASSWORD}</password>
+        </server>
+        <server>
+            <id>sonatype-nexus-staging</id>
+            <username>${env.SONATYPE_USERNAME}</username>
+            <password>${env.SONATYPE_PASSWORD}</password>
+        </server>
+    </servers>
+</settings>

@@ -2,8 +2,15 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
     <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>9</version>
+        <relativePath/>
+    </parent>
+
     <groupId>com.verapi.abyss</groupId>
     <artifactId>abyss-spec-transformer</artifactId>
     <version>1.0-SNAPSHOT</version>
@@ -49,16 +56,11 @@
             <organization>Verapi</organization>
             <organizationUrl>https://verapi.com</organizationUrl>
             <roles>
-                <role>Enterprise Architect</role>
+                <role>Developer</role>
             </roles>
             <timezone>+3</timezone>
         </contributor>
     </contributors>
-
-    <issueManagement>
-        <system>GitHub Issues</system>
-        <url>https://github.com/apiportal/abyss-spec-transformer/issues</url>
-    </issueManagement>
 
     <scm>
         <url>https://github.com/apiportal/abyss-spec-transformer</url>
@@ -67,6 +69,22 @@
         <tag>HEAD</tag>
     </scm>
 
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/apiportal/abyss-spec-transformer/issues</url>
+    </issueManagement>
+
+    <ciManagement>
+        <system>Travis CI</system>
+        <url>https://travis-ci.org/apiportal/abyss-spec-transformer</url>
+    </ciManagement>
+
+    <distributionManagement>
+        <site>
+            <id>site</id>
+            <url>scm:git:https://github.com/apiportal/abyss-spec-transformer.git</url>
+        </site>
+    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -97,7 +115,7 @@
         <version.maven-gpg-plugin.plugin>1.6</version.maven-gpg-plugin.plugin>
         <version.maven-scm-publish-plugin>3.0.0</version.maven-scm-publish-plugin>
         <version.maven-source-plugin>3.0.1</version.maven-source-plugin>
-        <version.maven-javadoc-plugin>3.0.0</version.maven-javadoc-plugin>
+        <version.maven-javadoc-plugin>3.1.0</version.maven-javadoc-plugin>
         <site.path>snapshot</site.path>
     </properties>
 
@@ -337,10 +355,12 @@
                         <configuration>
                             <keyname>${gpg.keyname}</keyname>
                             <passphraseServerId>${gpg.keyname}</passphraseServerId>
-                            <gpgArguments>
-                                <arg>--pinentry-mode</arg>
-                                <arg>loopback</arg>
-                            </gpgArguments>
+                            <!--
+                                                        <gpgArguments>
+                                                            <arg>&#45;&#45;pinentry-mode</arg>
+                                                            <arg>loopback</arg>
+                                                        </gpgArguments>
+                            -->
                         </configuration>
                     </execution>
                 </executions>
@@ -454,26 +474,25 @@
 
     <profiles>
         <profile>
-            <id>release</id>
+            <id>sonatype-oss-release</id>
             <properties>
                 <site.path>release</site.path>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>${version.maven-javadoc-plugin}</version>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${version.maven-gpg-plugin.plugin}</version>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
-
-    <distributionManagement>
-        <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <site>
-            <id>site</id>
-            <url>scm:git:https://github.com/apiportal/abyss-spec-transformer.git</url>
-        </site>
-    </distributionManagement>
 
 </project>

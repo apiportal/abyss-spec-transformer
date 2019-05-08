@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/apiportal/abyss-spec-transformer.svg?branch=master)](https://travis-ci.org/apiportal/abyss-spec-transformer)
+
 # ABYSS SPEC TRANSFORMER
 
 This application transforms provided `WSDL` into an `OpenAPI v3` spec yaml file. WSDL should be provided via path, URI or String  
